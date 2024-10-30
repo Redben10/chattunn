@@ -20,6 +20,7 @@
     <script>
         let source;
         const globalTunnelId = "global";
+        let currentTunnelId = ""; // Store the current tunnel ID
         const reconnectDelay = 2000; // Time to wait before retrying connection
 
         window.onload = function() {
@@ -104,6 +105,7 @@
             }
 
             listenToTunnel(tunnelId);
+            currentTunnelId = tunnelId; // Update the current tunnel ID
             alert(`Joining Tunnel ${tunnelId}...`);
         }
 
@@ -130,10 +132,9 @@
         }
 
         function sendMessage() {
-            const tunnelId = document.getElementById('tunnelId').value;
             const content = document.getElementById('messageContent').value;
 
-            if (!tunnelId || !content) {
+            if (!currentTunnelId || !content) {
                 alert("Please enter both a tunnel ID and message content.");
                 return;
             }
@@ -141,7 +142,7 @@
             fetch('https://txttunnel.onrender.com/api/v2/tunnel/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: tunnelId, content: content })
+                body: JSON.stringify({ id: currentTunnelId, content: content })
             })
             .then(response => {
                 if (response.ok) {
