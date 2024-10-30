@@ -21,25 +21,45 @@
         let source;
 
         window.onload = function() {
-            createGlobalTunnel().then(() => {
-                joinTunnel("global"); // Automatically join the global tunnel after creation
+            checkGlobalTunnel().then(() => {
+                joinTunnel("global"); // Automatically join the global tunnel after ensuring it exists
             });
         };
 
-        function createGlobalTunnel() {
-            return fetch('https://txttunnel.onrender.com/api/v2/tunnel/create', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: "global" })
-            })
-            .then(response => {
+        async function checkGlobalTunnel() {
+            try {
+                const response = await fetch('https://txttunnel.onrender.com/api/v2/tunnel/stream?id=global');
+                
+                // If the global tunnel doesn't exist, create it
+                if (response.status === 404) {
+                    console.log("Global tunnel doesn't exist. Creating it...");
+                    await createGlobalTunnel();
+                } else if (!response.ok) {
+                    alert("Error checking global tunnel.");
+                }
+            } catch (error) {
+                console.error("Error checking global tunnel:", error);
+            }
+        }
+
+        async function createGlobalTunnel() {
+            try {
+                const response = await fetch('https://txttunnel.onrender.com/api/v2/tunnel/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: "global" })
+                });
+
                 if (response.ok) {
                     console.log("Global tunnel created successfully.");
-                } else if (response.status !== 409) {
+                } else if (response.status === 409) {
+                    console.log("Global tunnel already exists.");
+                } else {
                     alert("Failed to create the global tunnel.");
                 }
-            })
-            .catch(error => console.error("Error creating global tunnel:", error));
+            } catch (error) {
+                console.error("Error creating global tunnel:", error);
+            }
         }
 
         function createTunnel() {
