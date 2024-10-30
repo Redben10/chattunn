@@ -4,149 +4,101 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TXTTunnel</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 50px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin: 10px;
+            cursor: pointer;
+        }
+        #messages {
+            margin-top: 20px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            text-align: left;
+        }
+    </style>
 </head>
 <body>
-    <h1>TXTTunnel</h1>
-    <input type="text" id="tunnelId" placeholder="Enter Tunnel ID" oninput="fetchMessages()" />
-
-    <button onclick="createTunnel()">Create Tunnel</button>
-    <button onclick="joinTunnel()">Join Tunnel</button>
-
-    <h2>Messages</h2>
+    <h1>Welcome to TXTTunnel</h1>
+    <button id="createTunnel">Create Tunnel</button>
+    <button id="joinTunnel">Join Tunnel</button>
+    <button id="globalTunnel">Join Global Tunnel</button>
     <div id="messages"></div>
-    <input type="text" id="messageContent" placeholder="Enter message" />
-    <button onclick="sendMessage()">Send Message</button>
 
     <script>
-        let source;
-        const globalTunnelId = "global";
-        let currentTunnelId = globalTunnelId; // Start with the global tunnel
-        const reconnectDelay = 2000; // Time to wait before retrying connection
+        const messagesDiv = document.getElementById('messages');
 
-        window.onload = function() {
-            checkAndJoinGlobalTunnel(); // Automatically check and join the global tunnel
+        document.getElementById('createTunnel').onclick = async () => {
+            const tunnelID = window.prompt("Enter the ID for the new tunnel:");
+            if (tunnelID) {
+                await createTunnel(tunnelID);
+            }
         };
 
-        async function fetchMessages() {
-            const tunnelId = document.getElementById('tunnelId').value;
-            if (!tunnelId) {
-                document.getElementById("messages").innerHTML = ""; // Clear messages if no ID
-                return;
+        document.getElementById('joinTunnel').onclick = async () => {
+            const tunnelID = window.prompt("Enter the ID of the tunnel you want to join:");
+            if (tunnelID) {
+                await joinTunnel(tunnelID);
             }
+        };
 
-            const response = await fetch(`https://txttunnel.onrender.com/api/v2/tunnel/messages?id=${tunnelId}`);
-            if (response.ok) {
-                const messages = await response.json();
-                const messagesDiv = document.getElementById("messages");
-                messagesDiv.innerHTML = ""; // Clear previous messages
-                messages.forEach(msg => {
-                    const newMessage = document.createElement("p");
-                    newMessage.textContent = msg;
-                    messagesDiv.appendChild(newMessage);
-                });
-            } else {
-                document.getElementById("messages").innerHTML = "No messages available or tunnel does not exist.";
-            }
-        }
+        document.getElementById('globalTunnel').onclick = async () => {
+            await joinTunnel('global');
+        };
 
-        async function checkAndJoinGlobalTunnel() {
-            const response = await fetch(`https://txttunnel.onrender.com/api/v2/tunnel/stream?id=${globalTunnelId}`);
-            
-            if (response.status === 404) {
-                console.log("Global tunnel doesn't exist. Creating it...");
-                await createGlobalTunnel();
-            }
-            joinTunnel(globalTunnelId); // Join the global tunnel
-        }
-
-        async function createGlobalTunnel() {
+        async function createTunnel(tunnelID) {
             const response = await fetch('https://txttunnel.onrender.com/api/v2/tunnel/create', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: globalTunnelId })
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ id: tunnelID })
             });
 
             if (response.ok) {
-                console.log("Global tunnel created successfully.");
-            } else if (response.status === 409) {
-                console.log("Global tunnel already exists.");
+                const data = await response.json();
+                console.log(`Tunnel created: ${data.id}`);
+                alert(`Tunnel ${data.id} created successfully!`);
             } else {
-                alert("Failed to create the global tunnel.");
+                alert("Failed to create tunnel: " + response.statusText);
             }
         }
 
-        function createTunnel() {
-            const tunnelId = document.getElementById('tunnelId').value;
-            if (!tunnelId) {
-                alert("Please enter a tunnel ID.");
-                return;
-            }
+        async function joinTunnel(tunnelID) {
+            const response = await fetch(`https://txttunnel.onrender.com/api/v2/tunnel/stream?id=${tunnelID}`);
 
-            fetch('https://txttunnel.onrender.com/api/v2/tunnel/create', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: tunnelId })
-            })
-            .then(response => {
-                if (response.ok) {
-                    alert(`Tunnel ${tunnelId} created successfully!`);
-                    joinTunnel(tunnelId); // Automatically join the new tunnel
-                } else if (response.status === 409) {
-                    alert("Tunnel ID already exists. Please join it instead.");
-                } else {
-                    alert("Failed to create the tunnel.");
-                }
-            })
-            .catch(error => console.error("Error:", error));
+            if (response.ok) {
+                startListening(tunnelID);
+            } else {
+                alert("Failed to join tunnel: " + response.statusText);
+            }
         }
 
-        function joinTunnel(tunnelId) {
-            currentTunnelId = tunnelId; // Update the current tunnel ID
+        function startListening(tunnelID) {
+            const eventSource = new EventSource(`https://txttunnel.onrender.com/api/v2/tunnel/stream?id=${tunnelID}`);
 
-            if (source) {
-                source.close(); // Close any existing connection
-            }
-            source = new EventSource(`https://txttunnel.onrender.com/api/v2/tunnel/stream?id=${tunnelId}`);
-            
-            source.onmessage = function(event) {
-                const messagesDiv = document.getElementById("messages");
-                const newMessage = document.createElement("p");
-                newMessage.textContent = event.data;
+            eventSource.onmessage = function(event) {
+                const message = event.data;
+                const newMessage = document.createElement('div');
+                newMessage.textContent = message;
                 messagesDiv.appendChild(newMessage);
+                messagesDiv.scrollTop = messagesDiv.scrollHeight; // Auto-scroll to the bottom
             };
 
-            source.onerror = function() {
-                alert(`Error connecting to tunnel: ${tunnelId}. Retrying...`);
-                source.close();
-                setTimeout(() => {
-                    joinTunnel(tunnelId); // Retry joining the tunnel
-                }, reconnectDelay);
+            eventSource.onerror = function() {
+                eventSource.close();
+                alert("Error connecting to the tunnel. Please try again.");
             };
 
-            alert(`Joining Tunnel ${tunnelId}...`);
-        }
-
-        function sendMessage() {
-            const content = document.getElementById('messageContent').value;
-
-            if (!currentTunnelId || !content) {
-                alert("Please enter both a tunnel ID and message content.");
-                return;
-            }
-
-            fetch('https://txttunnel.onrender.com/api/v2/tunnel/send', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: currentTunnelId, content: content })
-            })
-            .then(response => {
-                if (response.ok) {
-                    document.getElementById('messageContent').value = ""; // Clear the input field
-                } else {
-                    alert("Failed to send the message.");
-                }
-            })
-            .catch(error => console.error("Error:", error));
+            alert(`Joined tunnel: ${tunnelID}`);
         }
     </script>
 </body>
