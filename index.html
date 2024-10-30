@@ -107,19 +107,28 @@
                 return;
             }
 
+            // Debugging log to ensure payload structure
+            console.log("Sending message:", { id: tunnelId, content: message });
+
             fetch('https://txttunnel.onrender.com/api/v2/tunnel/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: tunnelId, content: message })
+                body: JSON.stringify({ id: tunnelId, content: message }) // Ensure structure matches expected format
             })
             .then(response => {
                 if (response.ok) {
-                    document.getElementById('message').value = ""; // Clear the message field
+                    document.getElementById('message').value = ""; // Clear the message field on success
                 } else {
-                    alert("Failed to send message.");
+                    return response.text().then(text => {
+                        console.error("Failed to send message:", text);
+                        alert("Failed to send message: " + text); // Display specific server error
+                    });
                 }
             })
-            .catch(error => console.error("Error:", error));
+            .catch(error => {
+                console.error("Error sending message:", error);
+                alert("Error sending message. Check console for details.");
+            });
         }
     </script>
 </body>
