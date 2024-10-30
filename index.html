@@ -3,41 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TXTTunnel Client</title>
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
-        input, button { padding: 10px; margin: 5px; width: 100%; }
-        #messages { margin-top: 20px; padding: 10px; border: 1px solid #ccc; height: 200px; overflow-y: scroll; }
-        .message { margin-bottom: 10px; padding: 10px; border-bottom: 1px solid #ddd; }
-    </style>
+    <title>TXTTunnel</title>
 </head>
 <body>
+    <h1>TXTTunnel</h1>
+    <input type="text" id="tunnelId" placeholder="Enter Tunnel ID" />
+    <button onclick="createTunnel()">Create/Join Tunnel</button>
 
-    <h1>Welcome to TXTTunnel</h1>
-    <p>Enter a tunnel ID to create or join a tunnel, send messages, and see real-time updates!</p>
-
-    <!-- Tunnel Configuration -->
-    <label for="tunnelId">Tunnel ID</label>
-    <input type="text" id="tunnelId" placeholder="Enter a tunnel ID">
-
-    <button onclick="createTunnel()">Create Tunnel</button>
-    <button onclick="joinTunnel()">Join Tunnel</button>
-
-    <!-- Message Sending Section -->
-    <label for="message">Message</label>
-    <input type="text" id="message" placeholder="Enter your message">
+    <h2>Messages</h2>
+    <div id="messages"></div>
+    <input type="text" id="messageContent" placeholder="Enter message" />
     <button onclick="sendMessage()">Send Message</button>
 
-    <!-- Message Display Section -->
-    <div id="messages"></div>
-
     <script>
-        let eventSource;
+        let source;
 
-        // Function to create a new tunnel
         function createTunnel() {
             const tunnelId = document.getElementById('tunnelId').value;
-
             if (!tunnelId) {
                 alert("Please enter a tunnel ID.");
                 return;
@@ -51,84 +33,52 @@
             .then(response => {
                 if (response.ok) {
                     listenToTunnel(tunnelId);
-                    alert(`Tunnel ${tunnelId} created successfully!`);
+                    alert(`Tunnel ${tunnelId} created/joined successfully!`);
                 } else if (response.status === 409) {
-                    alert("Tunnel ID already exists. Please join it or choose a different ID.");
+                    alert("Tunnel ID already exists. Joining the existing tunnel...");
+                    listenToTunnel(tunnelId);
                 } else {
-                    alert("Failed to create the tunnel.");
+                    alert("Failed to create/join the tunnel.");
                 }
             })
             .catch(error => console.error("Error:", error));
         }
 
-        // Function to join an existing tunnel
-        function joinTunnel() {
-            const tunnelId = document.getElementById('tunnelId').value;
-
-            if (!tunnelId) {
-                alert("Please enter a tunnel ID.");
-                return;
-            }
-
-            // Connect to the tunnel stream
-            listenToTunnel(tunnelId);
-            alert(`Joined tunnel ${tunnelId} successfully!`);
-        }
-
-        // Function to listen to tunnel messages in real-time
         function listenToTunnel(tunnelId) {
-            if (eventSource) {
-                eventSource.close(); // Close any previous connection
+            if (source) {
+                source.close();
             }
-
-            eventSource = new EventSource(`https://txttunnel.onrender.com/api/v2/tunnel/stream?id=${tunnelId}`);
-            eventSource.onmessage = (event) => {
-                const messagesDiv = document.getElementById('messages');
-                const newMessage = document.createElement('div');
-                newMessage.className = 'message';
+            source = new EventSource(`https://txttunnel.onrender.com/api/v2/tunnel/stream?id=${tunnelId}`);
+            source.onmessage = function(event) {
+                const messagesDiv = document.getElementById("messages");
+                const newMessage = document.createElement("p");
                 newMessage.textContent = event.data;
                 messagesDiv.appendChild(newMessage);
-                messagesDiv.scrollTop = messagesDiv.scrollHeight;
-            };
-
-            eventSource.onerror = () => {
-                console.log("Connection closed.");
-                eventSource.close();
             };
         }
 
-        // Function to send a message to a tunnel
         function sendMessage() {
             const tunnelId = document.getElementById('tunnelId').value;
-            const message = document.getElementById('message').value;
+            const content = document.getElementById('messageContent').value;
 
-            if (!tunnelId || !message) {
-                alert("Please fill in both the tunnel ID and message fields.");
+            if (!tunnelId || !content) {
+                alert("Please enter both a tunnel ID and message content.");
                 return;
             }
-
-            // Debugging log to ensure payload structure
-            console.log("Sending message:", { id: tunnelId, content: message });
 
             fetch('https://txttunnel.onrender.com/api/v2/tunnel/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: tunnelId, content: message }) // Ensure structure matches expected format
+                body: JSON.stringify({ id: tunnelId, content: content })
             })
             .then(response => {
                 if (response.ok) {
-                    document.getElementById('message').value = ""; // Clear the message field on success
+                    document.getElementById('messageContent').value = "";
                 } else {
-                    return response.text().then(text => {
-                        console.error("Failed to send message:", text);
-                        alert("Failed to send message: " + text); // Display specific server error
-                    });
+                    alert("Failed to send the message.");
                 }
             })
-            .catch(error => {
-                console.error("Error sending message:", error);
-                alert("Error sending message. Check console for details.");
-            });
+            .catch(error => console.error("Error:", error));
         }
     </script>
 </body>
