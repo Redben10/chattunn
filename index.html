@@ -8,7 +8,9 @@
 <body>
     <h1>TXTTunnel</h1>
     <input type="text" id="tunnelId" placeholder="Enter Tunnel ID" />
-    <button onclick="createTunnel()">Create/Join Tunnel</button>
+
+    <button onclick="createTunnel()">Create Tunnel</button>
+    <button onclick="joinTunnel()">Join Tunnel</button>
 
     <h2>Messages</h2>
     <div id="messages"></div>
@@ -33,15 +35,26 @@
             .then(response => {
                 if (response.ok) {
                     listenToTunnel(tunnelId);
-                    alert(`Tunnel ${tunnelId} created/joined successfully!`);
+                    alert(`Tunnel ${tunnelId} created successfully!`);
                 } else if (response.status === 409) {
-                    alert("Tunnel ID already exists. Joining the existing tunnel...");
-                    listenToTunnel(tunnelId);
+                    alert("Tunnel ID already exists. Please join it instead.");
                 } else {
-                    alert("Failed to create/join the tunnel.");
+                    alert("Failed to create the tunnel.");
                 }
             })
             .catch(error => console.error("Error:", error));
+        }
+
+        function joinTunnel() {
+            const tunnelId = document.getElementById('tunnelId').value;
+            if (!tunnelId) {
+                alert("Please enter a tunnel ID.");
+                return;
+            }
+
+            // Simply attempt to listen to the tunnel.
+            listenToTunnel(tunnelId);
+            alert(`Joining Tunnel ${tunnelId}...`);
         }
 
         function listenToTunnel(tunnelId) {
@@ -54,6 +67,11 @@
                 const newMessage = document.createElement("p");
                 newMessage.textContent = event.data;
                 messagesDiv.appendChild(newMessage);
+            };
+
+            source.onerror = function() {
+                alert("Error connecting to tunnel. Please check the Tunnel ID.");
+                source.close();
             };
         }
 
