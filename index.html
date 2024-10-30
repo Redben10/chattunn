@@ -19,16 +19,18 @@
 
     <script>
         let source;
+        const globalTunnelId = "global";
+        const reconnectDelay = 2000; // Time to wait before retrying connection
 
         window.onload = function() {
             checkGlobalTunnel().then(() => {
-                joinGlobalTunnel("global"); // Automatically join the global tunnel after ensuring it exists
+                joinGlobalTunnel(); // Automatically join the global tunnel after ensuring it exists
             });
         };
 
         async function checkGlobalTunnel() {
             try {
-                const response = await fetch('https://txttunnel.onrender.com/api/v2/tunnel/stream?id=global');
+                const response = await fetch(`https://txttunnel.onrender.com/api/v2/tunnel/stream?id=${globalTunnelId}`);
                 
                 // If the global tunnel doesn't exist, create it
                 if (response.status === 404) {
@@ -47,12 +49,11 @@
                 const response = await fetch('https://txttunnel.onrender.com/api/v2/tunnel/create', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id: "global" })
+                    body: JSON.stringify({ id: globalTunnelId })
                 });
 
                 if (response.ok) {
                     console.log("Global tunnel created successfully.");
-                    await delay(500); // Wait briefly before joining
                 } else if (response.status === 409) {
                     console.log("Global tunnel already exists.");
                 } else {
@@ -63,12 +64,8 @@
             }
         }
 
-        function delay(ms) {
-            return new Promise(resolve => setTimeout(resolve, ms));
-        }
-
-        function joinGlobalTunnel(tunnelId) {
-            joinTunnel(tunnelId);
+        function joinGlobalTunnel() {
+            joinTunnel(globalTunnelId);
         }
 
         function createTunnel() {
@@ -106,7 +103,6 @@
                 return;
             }
 
-            // Simply attempt to listen to the tunnel.
             listenToTunnel(tunnelId);
             alert(`Joining Tunnel ${tunnelId}...`);
         }
@@ -116,6 +112,7 @@
                 source.close();
             }
             source = new EventSource(`https://txttunnel.onrender.com/api/v2/tunnel/stream?id=${tunnelId}`);
+            
             source.onmessage = function(event) {
                 const messagesDiv = document.getElementById("messages");
                 const newMessage = document.createElement("p");
@@ -124,8 +121,11 @@
             };
 
             source.onerror = function() {
-                alert("Error connecting to tunnel. Please check the Tunnel ID.");
+                alert(`Error connecting to tunnel: ${tunnelId}. Retrying...`);
                 source.close();
+                setTimeout(() => {
+                    listenToTunnel(tunnelId); // Retry connection
+                }, reconnectDelay);
             };
         }
 
