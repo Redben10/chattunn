@@ -7,7 +7,7 @@
 </head>
 <body>
     <h1>TXTTunnel</h1>
-    <input type="text" id="tunnelId" placeholder="Enter Tunnel ID" />
+    <input type="text" id="tunnelId" placeholder="Enter Tunnel ID" oninput="fetchMessages()" />
 
     <button onclick="createTunnel()">Create Tunnel</button>
     <button onclick="joinTunnel()">Join Tunnel</button>
@@ -26,6 +26,28 @@
         window.onload = function() {
             checkAndJoinGlobalTunnel(); // Automatically check and join the global tunnel
         };
+
+        async function fetchMessages() {
+            const tunnelId = document.getElementById('tunnelId').value;
+            if (!tunnelId) {
+                document.getElementById("messages").innerHTML = ""; // Clear messages if no ID
+                return;
+            }
+
+            const response = await fetch(`https://txttunnel.onrender.com/api/v2/tunnel/messages?id=${tunnelId}`);
+            if (response.ok) {
+                const messages = await response.json();
+                const messagesDiv = document.getElementById("messages");
+                messagesDiv.innerHTML = ""; // Clear previous messages
+                messages.forEach(msg => {
+                    const newMessage = document.createElement("p");
+                    newMessage.textContent = msg;
+                    messagesDiv.appendChild(newMessage);
+                });
+            } else {
+                document.getElementById("messages").innerHTML = "No messages available or tunnel does not exist.";
+            }
+        }
 
         async function checkAndJoinGlobalTunnel() {
             const response = await fetch(`https://txttunnel.onrender.com/api/v2/tunnel/stream?id=${globalTunnelId}`);
