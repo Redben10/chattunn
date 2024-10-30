@@ -7,7 +7,7 @@
 </head>
 <body>
     <h1>TXTTunnel</h1>
-    <input type="text" id="tunnelId" value="global" disabled />
+    <input type="text" id="tunnelId" placeholder="Enter Tunnel ID" />
 
     <button onclick="createTunnel()">Create Tunnel</button>
     <button onclick="joinTunnel()">Join Tunnel</button>
@@ -21,8 +21,26 @@
         let source;
 
         window.onload = function() {
-            joinTunnel("global"); // Automatically join the global tunnel on load
+            createGlobalTunnel().then(() => {
+                joinTunnel("global"); // Automatically join the global tunnel after creation
+            });
         };
+
+        function createGlobalTunnel() {
+            return fetch('https://txttunnel.onrender.com/api/v2/tunnel/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: "global" })
+            })
+            .then(response => {
+                if (response.ok) {
+                    console.log("Global tunnel created successfully.");
+                } else if (response.status !== 409) {
+                    alert("Failed to create the global tunnel.");
+                }
+            })
+            .catch(error => console.error("Error creating global tunnel:", error));
+        }
 
         function createTunnel() {
             const tunnelId = document.getElementById('tunnelId').value;
@@ -50,6 +68,10 @@
         }
 
         function joinTunnel(tunnelId) {
+            if (!tunnelId) {
+                tunnelId = document.getElementById('tunnelId').value;
+            }
+
             if (!tunnelId) {
                 alert("Please enter a tunnel ID.");
                 return;
