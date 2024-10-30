@@ -17,7 +17,7 @@
 <body>
 
     <h1>Welcome to TXTTunnel</h1>
-    <p>Use the Create button to set up a new tunnel or the Join button to connect to an existing one.</p>
+    <p>Currently connected to the Default Tunnel. Use Create or Join to connect to another tunnel.</p>
 
     <input type="text" id="tunnelId" placeholder="Enter Tunnel ID">
     <button id="createButton" class="button">Create Tunnel</button>
@@ -32,7 +32,14 @@
 
     <script>
         const serverUrl = "https://txttunnel.onrender.com";
+        const defaultTunnelId = "default-tunnel"; // Default tunnel ID
+        let currentTunnelId = defaultTunnelId;
         const messageDisplay = document.getElementById("messageDisplay");
+
+        // Auto-connect to the default tunnel on load
+        window.onload = () => {
+            joinTunnel(defaultTunnelId);
+        };
 
         document.getElementById("createButton").addEventListener("click", () => {
             const tunnelId = document.getElementById("tunnelId").value.trim();
@@ -69,9 +76,8 @@
         });
 
         document.getElementById("sendButton").addEventListener("click", () => {
-            const tunnelId = document.getElementById("tunnelId").value.trim();
             const message = document.getElementById("messageInput").value.trim();
-            if (!tunnelId || !message) {
+            if (!currentTunnelId || !message) {
                 alert("Please enter both a tunnel ID and message.");
                 return;
             }
@@ -79,7 +85,7 @@
             fetch(`${serverUrl}/api/v2/tunnel/send`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ id: tunnelId, content: message, subChannel: "default" })
+                body: JSON.stringify({ id: currentTunnelId, content: message, subChannel: "default" })
             })
             .then(response => response.text())
             .then(result => {
@@ -92,6 +98,7 @@
         });
 
         function joinTunnel(tunnelId) {
+            currentTunnelId = tunnelId;
             const eventSource = new EventSource(`${serverUrl}/api/v2/tunnel/stream?id=${tunnelId}&subChannel=default`);
             eventSource.onmessage = function(event) {
                 displayMessage(`Received: ${event.data}`);
