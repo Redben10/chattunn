@@ -4,91 +4,83 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TXTTunnel</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        button { margin: 5px; }
+        #messages { border: 1px solid #ccc; padding: 10px; height: 200px; overflow-y: scroll; }
+    </style>
 </head>
 <body>
-    <h1>Welcome to TXTTunnel</h1>
-    <button onclick="createOrJoinTunnel('global')">Join/Create Global Tunnel</button>
-    <button onclick="promptTunnelID()">Join/Create Specific Tunnel</button>
-
-    <input type="text" id="messageInput" placeholder="Type your message here">
-    <button id="sendButton" onclick="sendMessage()" style="display:none;">Send</button>
-
+    <h1>TXTTunnel</h1>
+    <button id="createTunnelButton">Create Tunnel</button>
+    <button id="joinTunnelButton">Join Tunnel</button>
     <div id="messages"></div>
+    <input type="text" id="messageInput" placeholder="Type your message here..." />
+    <button id="sendMessageButton">Send Message</button>
 
     <script>
-        let currentTunnelID = null;
-        let eventSource = null;
+        let currentTunnelId = '';
+        const messagesDiv = document.getElementById('messages');
+        const messageInput = document.getElementById('messageInput');
 
-        function promptTunnelID() {
-            const tunnelID = prompt("Enter tunnel ID:");
-            if (tunnelID) {
-                createOrJoinTunnel(tunnelID);
-            }
-        }
-
-        async function createOrJoinTunnel(tunnelID) {
-            const response = await fetch('https://txttunnel.onrender.com/api/v2/tunnel/create', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ id: tunnelID })
-            });
-
-            if (!response.ok) {
-                if (response.status === 409) {
-                    // Tunnel already exists, try to join it
-                    alert(`Tunnel ${tunnelID} already exists. Joining...`);
-                } else {
-                    alert("Failed to create tunnel.");
-                    return;
-                }
-            }
-
-            // Always set the current tunnel ID
-            currentTunnelID = tunnelID;
-
-            // Start streaming messages
-            if (eventSource) {
-                eventSource.close(); // Close previous connection if any
-            }
-            eventSource = new EventSource(`https://txttunnel.onrender.com/api/v2/tunnel/stream?id=${currentTunnelID}`);
-
-            eventSource.onmessage = function(event) {
-                const messagesDiv = document.getElementById("messages");
-                messagesDiv.innerHTML += `<p>${event.data}</p>`;
-            };
-
-            document.getElementById("sendButton").style.display = "inline";
-            document.getElementById("messageInput").focus();
-        }
-
-        async function sendMessage() {
-            const messageInput = document.getElementById("messageInput");
-            const message = messageInput.value;
-
-            if (!message) {
-                alert("Please enter a message.");
-                return;
-            }
-
-            const response = await fetch('https://txttunnel.onrender.com/api/v2/tunnel/send', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    id: currentTunnelID,
-                    content: message
+        document.getElementById('createTunnelButton').addEventListener('click', () => {
+            const tunnelId = prompt("Enter tunnel ID to create:");
+            if (tunnelId) {
+                fetch('https://txttunnel.onrender.com/api/v2/tunnel/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: tunnelId })
                 })
-            });
-
-            if (response.ok) {
-                messageInput.value = ""; // Clear the input after sending
-            } else {
-                alert("Failed to send message.");
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to create tunnel');
+                    return response.json();
+                })
+                .then(data => {
+                    currentTunnelId = data.id;
+                    startListening(currentTunnelId);
+                })
+                .catch(err => alert(err.message));
             }
+        });
+
+        document.getElementById('joinTunnelButton').addEventListener('click', () => {
+            const tunnelId = prompt("Enter tunnel ID to join:");
+            if (tunnelId) {
+                startListening(tunnelId);
+            }
+        });
+
+        function startListening(tunnelId) {
+            fetch(`https://txttunnel.onrender.com/api/v2/tunnel/stream?id=${tunnelId}`)
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to connect to tunnel');
+                    const eventSource = new EventSource(`https://txttunnel.onrender.com/api/v2/tunnel/stream?id=${tunnelId}`);
+                    eventSource.onmessage = event => {
+                        messagesDiv.innerHTML += `<div>${event.data}</div>`;
+                        messagesDiv.scrollTop = messagesDiv.scrollHeight; // Scroll to bottom
+                    };
+                    currentTunnelId = tunnelId;
+                })
+                .catch(err => alert(err.message));
         }
+
+        document.getElementById('sendMessageButton').addEventListener('click', () => {
+            const message = messageInput.value;
+            if (message && currentTunnelId) {
+                fetch('https://txttunnel.onrender.com/api/v2/tunnel/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: currentTunnelId, content: message })
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to send message');
+                    messageInput.value = ''; // Clear input
+                })
+                .catch(err => alert(err.message));
+            } else {
+                alert('You must join a tunnel and enter a message to send.');
+            }
+        });
     </script>
 </body>
 </html>
