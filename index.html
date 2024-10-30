@@ -7,7 +7,7 @@
 </head>
 <body>
     <h1>TXTTunnel</h1>
-    <input type="text" id="tunnelId" placeholder="Enter Tunnel ID" />
+    <input type="text" id="tunnelId" value="global" disabled />
 
     <button onclick="createTunnel()">Create Tunnel</button>
     <button onclick="joinTunnel()">Join Tunnel</button>
@@ -19,6 +19,10 @@
 
     <script>
         let source;
+
+        window.onload = function() {
+            joinTunnel("global"); // Automatically join the global tunnel on load
+        };
 
         function createTunnel() {
             const tunnelId = document.getElementById('tunnelId').value;
@@ -45,8 +49,7 @@
             .catch(error => console.error("Error:", error));
         }
 
-        function joinTunnel() {
-            const tunnelId = document.getElementById('tunnelId').value;
+        function joinTunnel(tunnelId) {
             if (!tunnelId) {
                 alert("Please enter a tunnel ID.");
                 return;
