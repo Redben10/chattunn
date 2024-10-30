@@ -22,7 +22,7 @@
 
         window.onload = function() {
             checkGlobalTunnel().then(() => {
-                joinTunnel("global"); // Automatically join the global tunnel after ensuring it exists
+                joinGlobalTunnel("global"); // Automatically join the global tunnel after ensuring it exists
             });
         };
 
@@ -52,6 +52,7 @@
 
                 if (response.ok) {
                     console.log("Global tunnel created successfully.");
+                    await delay(500); // Wait briefly before joining
                 } else if (response.status === 409) {
                     console.log("Global tunnel already exists.");
                 } else {
@@ -60,6 +61,14 @@
             } catch (error) {
                 console.error("Error creating global tunnel:", error);
             }
+        }
+
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        function joinGlobalTunnel(tunnelId) {
+            joinTunnel(tunnelId);
         }
 
         function createTunnel() {
