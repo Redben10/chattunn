@@ -11,6 +11,7 @@
         .button { padding: 10px 15px; font-size: 16px; cursor: pointer; margin: 5px; }
         #createButton { background-color: #4CAF50; color: white; }
         #joinButton { background-color: #008CBA; color: white; }
+        #sendButton { background-color: #FF5722; color: white; }
     </style>
 </head>
 <body>
@@ -25,8 +26,12 @@
     <h2>Messages</h2>
     <div id="messageDisplay"></div>
 
+    <h2>Send a Message</h2>
+    <input type="text" id="messageInput" placeholder="Enter your message">
+    <button id="sendButton" class="button">Send Message</button>
+
     <script>
-        const serverUrl = "https://txttunnel.onrender.com";  // Updated server URL
+        const serverUrl = "https://txttunnel.onrender.com";
         const messageDisplay = document.getElementById("messageDisplay");
 
         document.getElementById("createButton").addEventListener("click", () => {
@@ -45,7 +50,7 @@
             .then(data => {
                 if (data.id) {
                     alert(`Tunnel created with ID: ${data.id}`);
-                    joinTunnel(data.id);  // Automatically join the newly created tunnel
+                    joinTunnel(data.id);
                 }
             })
             .catch(error => {
@@ -61,6 +66,29 @@
                 return;
             }
             joinTunnel(tunnelId);
+        });
+
+        document.getElementById("sendButton").addEventListener("click", () => {
+            const tunnelId = document.getElementById("tunnelId").value.trim();
+            const message = document.getElementById("messageInput").value.trim();
+            if (!tunnelId || !message) {
+                alert("Please enter both a tunnel ID and message.");
+                return;
+            }
+
+            fetch(`${serverUrl}/api/v2/tunnel/send`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: tunnelId, content: message, subChannel: "default" })
+            })
+            .then(response => response.text())
+            .then(result => {
+                displayMessage(`Sent: ${message}`);
+            })
+            .catch(error => {
+                console.error("Error sending message:", error);
+                alert("Failed to send message.");
+            });
         });
 
         function joinTunnel(tunnelId) {
