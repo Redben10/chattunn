@@ -62,11 +62,23 @@
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ id: roomId })
-        }).then(response => response.json()).then(data => {
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error("Room already exists");
+            }
+            return response.json();
+        })
+        .then(data => {
             joinRoom(roomId);
-        }).catch(error => {
-            alert("Failed to create room.");
-            console.error(error);
+        })
+        .catch(error => {
+            if (error.message === "Room already exists") {
+                alert(`Room "${roomId}" already exists. Please choose a different code.`);
+            } else {
+                alert("Failed to create room.");
+                console.error(error);
+            }
         });
     }
 
