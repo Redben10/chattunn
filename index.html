@@ -3,123 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TXTTunnel Chat</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
-        #chatContainer { max-width: 500px; margin: 0 auto; }
-        #messages { border: 1px solid #ddd; padding: 10px; height: 300px; overflow-y: scroll; margin-bottom: 10px; }
-        #inputContainer { display: flex; }
-        #messageInput { flex: 1; padding: 10px; }
-        #sendButton, #createButton, #joinButton { padding: 10px; margin-left: 5px; cursor: pointer; }
-    </style>
+    <title>Chat Room</title>
 </head>
 <body>
-
-<div id="chatContainer">
-    <h2>TXTTunnel Chat</h2>
-    <div id="roomInfo">Connected to room: <strong>global</strong></div>
-    <div id="messages"></div>
-    <div id="inputContainer">
-        <input type="text" id="messageInput" placeholder="Type a message...">
-        <button id="sendButton">Send</button>
+    <h1>Welcome to TXTTunnel Chat</h1>
+    
+    <!-- New Username Section -->
+    <div>
+        <input type="text" id="usernameInput" placeholder="Enter your username" />
+        <button id="setUsernameBtn">Set Username</button>
     </div>
-    <div style="margin-top: 10px;">
-        <button id="createButton">Create Room</button>
-        <button id="joinButton">Join Room</button>
-    </div>
-</div>
 
-<script>
-    const serverUrl = "https://txttunnel.onrender.com";
-    let currentRoom = "global";
-    const messagesDiv = document.getElementById("messages");
-    const roomInfo = document.getElementById("roomInfo");
+    <h2>Current Room: <span id="currentRoom">global</span></h2>
+    
+    <button id="createRoomBtn">Create Room</button>
+    <button id="joinRoomBtn">Join Room</button>
+    
+    <div id="chatMessages"></div>
+    <input type="text" id="messageInput" placeholder="Type a message..." />
+    <button id="sendMessageBtn">Send</button>
 
-    joinRoom("global");
+    <script>
+        let username = ""; // To store the username
 
-    document.getElementById("createButton").addEventListener("click", () => {
-        const roomId = prompt("Enter room code to create:");
-        if (roomId) {
-            fetch(`${serverUrl}/api/v2/tunnel/checkRoomExists`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ id: roomId })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.exists) {
-                    alert("This room is already created. Try joining it instead.");
-                } else {
-                    createRoom(roomId);
-                }
-            })
-            .catch(console.error);
-        }
-    });
-
-    document.getElementById("joinButton").addEventListener("click", () => {
-        const roomId = prompt("Enter room code to join:");
-        if (roomId) {
-            joinRoom(roomId);
-        }
-    });
-
-    document.getElementById("sendButton").addEventListener("click", sendMessage);
-    document.getElementById("messageInput").addEventListener("keypress", (e) => {
-        if (e.key === "Enter") sendMessage();
-    });
-
-    function createRoom(roomId) {
-        fetch(`${serverUrl}/api/v2/tunnel/create`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: roomId })
-        })
-        .then(response => {
-            if (!response.ok) {
-                response.text().then(alert);
-                return;
-            }
-            currentRoom = roomId;
-            roomInfo.innerHTML = `Connected to room: <strong>${currentRoom}</strong>`;
-            joinRoom(currentRoom);
-        })
-        .catch(console.error);
-    }
-
-    function joinRoom(roomId) {
-        currentRoom = roomId;
-        roomInfo.innerHTML = `Connected to room: <strong>${currentRoom}</strong>`;
-        messagesDiv.innerHTML = "";
-
-        const eventSource = new EventSource(`${serverUrl}/api/v2/tunnel/stream?id=${currentRoom}&subChannel=main`);
-        eventSource.onmessage = (event) => {
-            const message = document.createElement("div");
-            message.textContent = event.data;
-            messagesDiv.appendChild(message);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-        };
-    }
-
-    function sendMessage() {
-        const messageInput = document.getElementById("messageInput");
-        const message = messageInput.value.trim();
-        if (message === "") return;
-
-        fetch(`${serverUrl}/api/v2/tunnel/send`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: currentRoom, content: message, subChannel: "main" })
-        })
-        .then(response => {
-            if (response.ok) {
-                messageInput.value = "";
+        document.getElementById("setUsernameBtn").onclick = function() {
+            const input = document.getElementById("usernameInput").value;
+            if (input) {
+                username = input; // Set the username
+                alert(`Username set to: ${username}`);
+                document.getElementById("usernameInput").value = ""; // Clear input
             } else {
-                response.text().then(alert);
+                alert("Please enter a username.");
             }
-        })
-        .catch(console.error);
-    }
-</script>
+        };
+
+        // Room creation functionality
+        document.getElementById("createRoomBtn").onclick = function() {
+            const roomId = prompt("Enter room ID to create:");
+            if (roomId) {
+                // Check if room exists and create it if it does not
+                fetch('https://txttunnel.onrender.com/api/v2/tunnel/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: roomId })
+                })
+                .then(response => {
+                    if (response.ok) {
+                        alert("Room created successfully!");
+                        // Update the current room
+                        document.getElementById("currentRoom").innerText = roomId;
+                    } else {
+                        alert("This room is already created. Try joining it instead.");
+                    }
+                });
+            }
+        };
+
+        // Room joining functionality
+        document.getElementById("joinRoomBtn").onclick = function() {
+            const roomId = prompt("Enter room ID to join:");
+            if (roomId) {
+                // Join the room (implement joining logic)
+                alert(`Joining room: ${roomId}`);
+                document.getElementById("currentRoom").innerText = roomId;
+            }
+        };
+
+        // Message sending functionality
+        document.getElementById("sendMessageBtn").onclick = function() {
+            const message = document.getElementById("messageInput").value;
+            if (message) {
+                // Send the message along with the username
+                const content = username ? `${username}: ${message}` : message;
+
+                fetch('https://txttunnel.onrender.com/api/v2/tunnel/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: document.getElementById("currentRoom").innerText,
+                        content: content,
+                        subChannel: "general" // Or whatever subChannel you want to use
+                    })
+                });
+
+                document.getElementById("messageInput").value = ""; // Clear the input
+            } else {
+                alert("Please enter a message.");
+            }
+        };
+
+        // Implement receiving messages logic to display them
+    </script>
 </body>
 </html>
