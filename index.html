@@ -39,10 +39,15 @@
     joinRoom("global");
 
     // Create button logic
-    document.getElementById("createButton").onclick = () => {
+    document.getElementById("createButton").onclick = async () => {
         const roomId = prompt("Enter a room code to create:");
         if (roomId) {
-            createRoom(roomId);
+            const exists = await checkRoomExists(roomId);
+            if (exists) {
+                alert(`Room "${roomId}" already exists. Please choose a different code.`);
+            } else {
+                createRoom(roomId);
+            }
         }
     };
 
@@ -57,6 +62,11 @@
     // Send button logic
     document.getElementById("sendButton").onclick = sendMessage;
 
+    async function checkRoomExists(roomId) {
+        const response = await fetch(`${serverUrl}/api/v2/tunnel/stream?id=${roomId}&subChannel=chat`, { method: "HEAD" });
+        return response.ok;
+    }
+
     function createRoom(roomId) {
         fetch(`${serverUrl}/api/v2/tunnel/create`, {
             method: "POST",
@@ -65,20 +75,13 @@
         })
         .then(response => {
             if (!response.ok) {
-                throw new Error("Room already exists");
+                throw new Error("Failed to create room.");
             }
-            return response.json();
-        })
-        .then(data => {
             joinRoom(roomId);
         })
         .catch(error => {
-            if (error.message === "Room already exists") {
-                alert(`Room "${roomId}" already exists. Please choose a different code.`);
-            } else {
-                alert("Failed to create room.");
-                console.error(error);
-            }
+            alert("Error creating room.");
+            console.error(error);
         });
     }
 
@@ -87,12 +90,10 @@
         roomInfo.innerHTML = `Connected to room: <strong>${roomId}</strong>`;
         messagesDiv.innerHTML = "";
 
-        // Close any existing event source connection
         if (window.eventSource) {
             window.eventSource.close();
         }
 
-        // Stream messages for the room
         window.eventSource = new EventSource(`${serverUrl}/api/v2/tunnel/stream?id=${roomId}&subChannel=chat`);
         window.eventSource.onmessage = event => {
             const message = document.createElement("div");
