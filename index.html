@@ -4,15 +4,41 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat Room</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        #chatMessages {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+            height: 200px;
+            overflow-y: scroll;
+            background-color: #fff;
+        }
+        input[type="text"] {
+            width: 300px;
+            padding: 10px;
+            margin-right: 5px;
+        }
+        button {
+            padding: 10px;
+            cursor: pointer;
+        }
+    </style>
 </head>
 <body>
     <h1>Welcome to TXTTunnel Chat</h1>
     
-    <!-- New Username Section -->
-    <div>
-        <input type="text" id="usernameInput" placeholder="Enter your username" />
-        <button id="setUsernameBtn">Set Username</button>
-    </div>
+    <h2>Set Your Username</h2>
+    <input type="text" id="usernameInput" placeholder="Enter your username" />
+    <button id="setUsernameBtn">Set Username</button>
 
     <h2>Current Room: <span id="currentRoom">global</span></h2>
     
