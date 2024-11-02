@@ -35,86 +35,65 @@
     const messagesDiv = document.getElementById("messages");
     const roomInfo = document.getElementById("roomInfo");
 
-    // Join the global room on page load
     joinRoom("global");
 
-    // Create button logic
-    document.getElementById("createButton").onclick = async () => {
-        const roomId = prompt("Enter a room code to create:");
+    document.getElementById("createButton").addEventListener("click", () => {
+        const roomId = prompt("Enter room code to create:");
         if (roomId) {
-            const exists = await checkRoomExists(roomId);
-            if (exists) {
-                alert(`This Room is already created, try joining it instead.`);
-            } else {
-                await createRoom(roomId);
-            }
-        }
-    };
-
-    // Join button logic
-    document.getElementById("joinButton").onclick = () => {
-        const roomId = prompt("Enter a room code to join:");
-        if (roomId) {
-            joinRoom(roomId);
-        }
-    };
-
-    // Send button logic
-    document.getElementById("sendButton").onclick = sendMessage;
-
-    // Send message on Enter key press
-    document.getElementById("messageInput").addEventListener("keypress", (event) => {
-        if (event.key === "Enter") {
-            event.preventDefault();  // Prevents newline in input
-            sendMessage();
-        }
-    });
-
-    async function checkRoomExists(roomId) {
-        try {
-            const response = await fetch(`${serverUrl}/api/v2/tunnel/stream?id=${roomId}&subChannel=chat`, {
-                method: "GET",
-            });
-
-            // If the response is OK, it means the room exists
-            return response.ok;
-        } catch (error) {
-            console.error("Error checking room:", error);
-            return false;
-        }
-    }
-
-    async function createRoom(roomId) {
-        try {
-            const response = await fetch(`${serverUrl}/api/v2/tunnel/create`, {
+            fetch(`${serverUrl}/api/v2/tunnel/checkRoomExists`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ id: roomId })
-            });
-
-            if (!response.ok) {
-                throw new Error("Failed to create room.");
-            }
-            
-            // Join the room after successful creation
-            joinRoom(roomId);
-        } catch (error) {
-            alert("Error creating room.");
-            console.error(error);
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.exists) {
+                    alert("This room is already created. Try joining it instead.");
+                } else {
+                    createRoom(roomId);
+                }
+            })
+            .catch(console.error);
         }
+    });
+
+    document.getElementById("joinButton").addEventListener("click", () => {
+        const roomId = prompt("Enter room code to join:");
+        if (roomId) {
+            joinRoom(roomId);
+        }
+    });
+
+    document.getElementById("sendButton").addEventListener("click", sendMessage);
+    document.getElementById("messageInput").addEventListener("keypress", (e) => {
+        if (e.key === "Enter") sendMessage();
+    });
+
+    function createRoom(roomId) {
+        fetch(`${serverUrl}/api/v2/tunnel/create`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: roomId })
+        })
+        .then(response => {
+            if (!response.ok) {
+                response.text().then(alert);
+                return;
+            }
+            currentRoom = roomId;
+            roomInfo.innerHTML = `Connected to room: <strong>${currentRoom}</strong>`;
+            joinRoom(currentRoom);
+        })
+        .catch(console.error);
     }
 
     function joinRoom(roomId) {
         currentRoom = roomId;
-        roomInfo.innerHTML = `Connected to room: <strong>${roomId}</strong>`;
+        roomInfo.innerHTML = `Connected to room: <strong>${currentRoom}</strong>`;
         messagesDiv.innerHTML = "";
 
-        if (window.eventSource) {
-            window.eventSource.close();
-        }
-
-        window.eventSource = new EventSource(`${serverUrl}/api/v2/tunnel/stream?id=${roomId}&subChannel=chat`);
-        window.eventSource.onmessage = event => {
+        const eventSource = new EventSource(`${serverUrl}/api/v2/tunnel/stream?id=${currentRoom}&subChannel=main`);
+        eventSource.onmessage = (event) => {
             const message = document.createElement("div");
             message.textContent = event.data;
             messagesDiv.appendChild(message);
@@ -124,21 +103,23 @@
 
     function sendMessage() {
         const messageInput = document.getElementById("messageInput");
-        const messageContent = messageInput.value.trim();
-        if (messageContent === "") return;
+        const message = messageInput.value.trim();
+        if (message === "") return;
 
         fetch(`${serverUrl}/api/v2/tunnel/send`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: currentRoom, content: messageContent, subChannel: "chat" })
-        }).then(() => {
-            messageInput.value = ""; // Clear the input field after sending
-        }).catch(error => {
-            alert("Failed to send message.");
-            console.error(error);
-        });
+            body: JSON.stringify({ id: currentRoom, content: message, subChannel: "main" })
+        })
+        .then(response => {
+            if (response.ok) {
+                messageInput.value = "";
+            } else {
+                response.text().then(alert);
+            }
+        })
+        .catch(console.error);
     }
 </script>
-
 </body>
 </html>
