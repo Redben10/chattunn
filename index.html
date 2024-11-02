@@ -44,7 +44,7 @@
         if (roomId) {
             const exists = await checkRoomExists(roomId);
             if (exists) {
-                alert(`Room "${roomId}" already exists. Please choose a different code.`);
+                alert(`This Room is already created, try joining it instead.`);
             } else {
                 await createRoom(roomId);
             }
