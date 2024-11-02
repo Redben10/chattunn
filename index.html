@@ -63,8 +63,17 @@
     document.getElementById("sendButton").onclick = sendMessage;
 
     async function checkRoomExists(roomId) {
-        const response = await fetch(`${serverUrl}/api/v2/tunnel/stream?id=${roomId}&subChannel=chat`, { method: "HEAD" });
-        return response.ok;
+        try {
+            const response = await fetch(`${serverUrl}/api/v2/tunnel/stream?id=${roomId}&subChannel=chat`, {
+                method: "GET",
+            });
+
+            // If the response is OK, it means the room exists
+            return response.ok;
+        } catch (error) {
+            console.error("Error checking room:", error);
+            return false;
+        }
     }
 
     function createRoom(roomId) {
