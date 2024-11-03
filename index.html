@@ -1,244 +1,257 @@
-package main
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TXTTunnel Chat</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #1a1a1a;
+            color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
 
-import (
-	"encoding/json"
-	"fmt"
-	"io"
-	"log"
-	"net/http"
-	"sync"
-	"time"
-)
+        #particles-js {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0; 
+            pointer-events: none;
+        }
 
-type Tunnel struct {
-	ID          string
-	Content     string
-	SubChannels map[string]string
-}
+        .topbar {
+            background-color: #222;
+            padding: 20px;
+            text-align: center;
+            border-bottom: 2px solid #444;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
 
-var tunnels = make(map[string]*Tunnel)
-var tunnelsMutex = &sync.Mutex{}
-var clients = make(map[string]map[string][]chan string)
-var clientsMutex = &sync.Mutex{}
+        .topbar h1 {
+            margin: 0;
+            font-size: 2.5em;
+            color: #f5f5f5;
+        }
 
-const globalRoomId = "global"
+        .nav-buttons {
+            margin-top: 10px;
+        }
 
-func main() {
-	// Create the global room on startup
-	tunnelsMutex.Lock()
-	tunnels[globalRoomId] = &Tunnel{ID: globalRoomId, Content: "", SubChannels: make(map[string]string)}
-	tunnelsMutex.Unlock()
+        .nav-button, .nav-button2 {
+            text-decoration: none;
+            background-color: #333;
+            border: none;
+            color: #fff;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            border-radius: 30px;
+            transition: background-color 0.3s, transform 0.2s;
+        }
 
-	// Start the keep-alive goroutine
-	go keepServerAlive()
+        .nav-button:hover, .nav-button2:hover {
+            background-color: #555;
+            transform: scale(1.05);
+        }
 
-	log.Println("Starting server on port 2427")
-	http.HandleFunc("/", withCORS(homePage))
-	http.HandleFunc("/api/v2/tunnel/create", withCORS(createTunnel))
-	http.HandleFunc("/api/v2/tunnel/checkRoomExists", withCORS(checkRoomExists))
-	http.HandleFunc("/api/v2/tunnel/stream", withCORS(streamTunnelContent))
-	http.HandleFunc("/api/v2/tunnel/send", withCORS(sendToTunnel))
-	log.Fatal(http.ListenAndServe(":2427", nil))
-}
+        .nav-button2 {
+            background-color: #666;
+        }
 
-func keepServerAlive() {
-	ticker := time.NewTicker(1 * time.Minute) // Set the interval to 10 minutes
-	defer ticker.Stop()
+        #chatContainer {
+            width: 90%; /* Set to occupy 90% of viewport width */
+            max-width: 1600px; /* Ensures it doesn't exceed 1600px */
+            margin: 0 auto;
+            position: relative;
+            z-index: 1; /* Ensure chat container is above particles */
+            background-color: rgba(34, 34, 34, 0.8);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
 
-	for range ticker.C {
-		resp, err := http.Get("http://localhost:2427/") // Ping the server's home page
-		if err != nil {
-			log.Printf("Failed to ping the server: %v", err)
-			continue
-		}
-		resp.Body.Close()
-		log.Println("Pinged server to keep it alive")
-	}
-}
+        #messages {
+            border: 1px solid #ddd;
+            padding: 10px;
+            height: 300px;
+            overflow-y: scroll;
+            margin-bottom: 10px;
+            background-color: #222;
+            border-radius: 5px;
+        }
 
-func homePage(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Welcome to the TXTTunnel homepage!")
-}
+        #inputContainer {
+            display: flex;
+        }
 
-func withCORS(handler http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-		handler(w, r)
-	}
-}
+        #messageInput {
+            flex: 1;
+            padding: 10px;
+            border-radius: 5px;
+            border: none;
+            background-color: #333;
+            color: #f5f5f5;
+        }
 
-func sendToTunnel(w http.ResponseWriter, r *http.Request) {
-	var requestData struct {
-		ID         string `json:"id"`
-		Content    string `json:"content"`
-		SubChannel string `json:"subChannel"`
-	}
+        #sendButton, #createButton, #joinButton, #setUsernameButton {
+            padding: 10px;
+            margin-left: 5px;
+            cursor: pointer;
+            background-color: #555;
+            border: none;
+            border-radius: 5px;
+            color: #fff;
+            transition: background-color 0.3s;
+        }
 
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "Failed to read request body", http.StatusInternalServerError)
-		return
-	}
+        #sendButton:hover, #createButton:hover, #joinButton:hover, #setUsernameButton:hover {
+            background-color: #777;
+        }
+    </style>
+</head>
+<body>
+    <div id="particles-js"></div> <!-- Particles.js container -->
+    <div class="topbar">
+        <h1>TXTTunnel Chat</h1>
+        <div class="nav-buttons">
+            <a href="./" class="nav-button">Home</a>
+            <a href="./Games.html" class="nav-button">Games</a>
+            <a href="./About.html" class="nav-button2">About</a>
+        </div>
+    </div>
+    <div id="chatContainer">
+        <div id="roomInfo">Connected to room: <strong>global</strong></div>
+        <div id="messages"></div>
+        <div id="inputContainer">
+            <input type="text" id="messageInput" placeholder="Type a message...">
+            <button id="sendButton">Send</button>
+        </div>
+        <div style="margin-top: 10px;">
+            <button id="createButton">Create Room</button>
+            <button id="joinButton">Join Room</button>
+            <button id="setUsernameButton">Set Username</button>
+        </div>
+    </div>
 
-	err = json.Unmarshal(body, &requestData)
-	if err != nil {
-		http.Error(w, "Failed to parse JSON", http.StatusBadRequest)
-		return
-	}
+    <script>
+        const serverUrl = "https://txttunnel.onrender.com";
+        let currentRoom = "global";
+        let username = "";
+        const messagesDiv = document.getElementById("messages");
+        const roomInfo = document.getElementById("roomInfo");
+        const sendButton = document.getElementById("sendButton");
+        const messageInput = document.getElementById("messageInput");
 
-	if requestData.ID == "" {
-		http.Error(w, "No tunnel id has been provided.", http.StatusBadRequest)
-		return
-	}
+        joinRoom("global");
 
-	if requestData.Content == "" {
-		http.Error(w, "No content has been provided.", http.StatusBadRequest)
-		return
-	}
+        document.getElementById("createButton").addEventListener("click", () => {
+            const roomId = prompt("Enter room code to create:");
+            if (roomId) {
+                fetch(`${serverUrl}/api/v2/tunnel/checkRoomExists`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ id: roomId })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.exists) {
+                        alert("This room is already created. Try joining it instead.");
+                    } else {
+                        createRoom(roomId);
+                    }
+                })
+                .catch(console.error);
+            }
+        });
 
-	if requestData.SubChannel == "" {
-		http.Error(w, "No subChannel has been provided.", http.StatusBadRequest)
-		return
-	}
+        document.getElementById("joinButton").addEventListener("click", () => {
+            const roomId = prompt("Enter room code to join:");
+            if (roomId) {
+                joinRoom(roomId);
+            }
+        });
 
-	tunnelsMutex.Lock()
-	tunnel, exists := tunnels[requestData.ID]
-	if !exists {
-		tunnelsMutex.Unlock()
-		http.Error(w, "No tunnel with this id exists.", http.StatusInternalServerError)
-		return
-	}
-	tunnel.SubChannels[requestData.SubChannel] = requestData.Content
-	tunnelsMutex.Unlock()
+        document.getElementById("setUsernameButton").addEventListener("click", () => {
+            const newUsername = prompt("Enter your username:");
+            if (newUsername) {
+                username = newUsername;
+                alert(`Username set to: ${username}`);
+            }
+        });
 
-	clientsMutex.Lock()
-	for _, client := range clients[requestData.ID][requestData.SubChannel] {
-		client <- requestData.Content
-	}
-	clientsMutex.Unlock()
+        sendButton.addEventListener("click", sendMessage);
+        messageInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") sendMessage();
+        });
 
-	log.Printf("Tunnel %s subChannel %s has been updated.", requestData.ID, requestData.SubChannel)
-	fmt.Fprintf(w, "Tunnel %s subChannel %s has been updated.", requestData.ID, requestData.SubChannel)
-}
+        function createRoom(roomId) {
+            fetch(`${serverUrl}/api/v2/tunnel/create`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: roomId })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    response.text().then(alert);
+                    return;
+                }
+                currentRoom = roomId;
+                roomInfo.innerHTML = `Connected to room: <strong>${currentRoom}</strong>`;
+                joinRoom(currentRoom);
+            })
+            .catch(console.error);
+        }
 
-func streamTunnelContent(w http.ResponseWriter, r *http.Request) {
-	tunnelId := r.URL.Query().Get("id")
-	subChannel := r.URL.Query().Get("subChannel")
-	if tunnelId == "" {
-		http.Error(w, "No tunnel id has been provided.\nPlease use ?id= to include the tunnel id.", http.StatusBadRequest)
-		return
-	}
-	if subChannel == "" {
-		http.Error(w, "No subChannel has been provided.\nPlease use ?subChannel= to include the subChannel.", http.StatusBadRequest)
-		return
-	}
+        function joinRoom(roomId) {
+            currentRoom = roomId;
+            roomInfo.innerHTML = `Connected to room: <strong>${currentRoom}</strong>`;
+            messagesDiv.innerHTML = "";
 
-	tunnelsMutex.Lock()
-	_, exists := tunnels[tunnelId]
-	if !exists {
-		tunnelsMutex.Unlock()
-		http.Error(w, "No tunnel with this id exists.", http.StatusInternalServerError)
-		return
-	}
-	tunnelsMutex.Unlock()
+            const eventSource = new EventSource(`${serverUrl}/api/v2/tunnel/stream?id=${currentRoom}&subChannel=main`);
+            eventSource.onmessage = (event) => {
+                const message = document.createElement("div");
+                message.textContent = event.data;
+                messagesDiv.appendChild(message);
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            };
+        }
 
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (message === "") return;
 
-	clientChan := make(chan string)
-	clientsMutex.Lock()
-	if clients[tunnelId] == nil {
-		clients[tunnelId] = make(map[string][]chan string)
-	}
-	clients[tunnelId][subChannel] = append(clients[tunnelId][subChannel], clientChan)
-	clientsMutex.Unlock()
+            if (username === "") {
+                alert("Please set a username before sending messages.");
+                return;
+            }
 
-	for {
-		select {
-		case msg := <-clientChan:
-			fmt.Fprintf(w, "data: %s\n\n", msg)
-			w.(http.Flusher).Flush()
-		case <-r.Context().Done():
-			clientsMutex.Lock()
-			for i, client := range clients[tunnelId][subChannel] {
-				if client == clientChan {
-					clients[tunnelId][subChannel] = append(clients[tunnelId][subChannel][:i], clients[tunnelId][subChannel][i+1:]...)
-					break
-				}
-			}
-			clientsMutex.Unlock()
-			return
-		}
-	}
-}
+            const formattedMessage = `${username}: ${message}`;
 
-func createTunnel(w http.ResponseWriter, r *http.Request) {
-	var requestData struct {
-		ID string `json:"id"`
-	}
-
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "Failed to read request body", http.StatusInternalServerError)
-		return
-	}
-
-	err = json.Unmarshal(body, &requestData)
-	if err != nil || requestData.ID == "" {
-		http.Error(w, "Invalid room ID", http.StatusBadRequest)
-		return
-	}
-
-	tunnelsMutex.Lock()
-	_, exists := tunnels[requestData.ID]
-	if exists {
-		tunnelsMutex.Unlock()
-		http.Error(w, "Room already exists. Try joining it instead.", http.StatusBadRequest)
-		return
-	}
-
-	tunnelId := requestData.ID
-	tunnels[tunnelId] = &Tunnel{ID: tunnelId, Content: "", SubChannels: make(map[string]string)}
-	tunnelsMutex.Unlock()
-
-	w.Header().Set("Content-Type", "application/json")
-	response, err := json.Marshal(map[string]string{"id": tunnelId})
-	if err != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		return
-	}
-	w.Write(response)
-	log.Printf("Tunnel %s has been created.", tunnelId)
-}
-
-func checkRoomExists(w http.ResponseWriter, r *http.Request) {
-	var requestData struct {
-		ID string `json:"id"`
-	}
-
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "Failed to read request body", http.StatusInternalServerError)
-		return
-	}
-
-	err = json.Unmarshal(body, &requestData)
-	if err != nil || requestData.ID == "" {
-		http.Error(w, "Invalid room ID", http.StatusBadRequest)
-		return
-	}
-
-	tunnelsMutex.Lock()
-	_, exists := tunnels[requestData.ID]
-	tunnelsMutex.Unlock()
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]bool{"exists": exists})
-}
+            fetch(`${serverUrl}/api/v2/tunnel/send`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: currentRoom, content: formattedMessage, subChannel: "main" })
+            })
+            .then(response => {
+                if (response.ok) {
+                    messageInput.value = "";
+                } else {
+                    response.text().then(alert);
+                }
+            })
+            .catch(console.error);
+        }
+    </script>
+</body>
+</html>
