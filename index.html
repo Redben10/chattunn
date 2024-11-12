@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TXTTunnel Chat</title>
+    <script src="js/app.js" defer></script>
+    <script src="particles.js"></script>
+    <title>Chat Room</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -23,7 +25,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            z-index: 0; 
+            z-index: 0;
             pointer-events: none;
         }
 
@@ -70,15 +72,20 @@
         }
 
         #chatContainer {
-            width: 90%; /* Set to occupy 90% of viewport width */
-            max-width: 1600px; /* Ensures it doesn't exceed 1600px */
+            width: 90%;
+            max-width: 1600px;
             margin: 0 auto;
             position: relative;
-            z-index: 1; /* Ensure chat container is above particles */
+            z-index: 1;
             background-color: rgba(34, 34, 34, 0.8);
             border-radius: 8px;
             padding: 20px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        #roomInfo {
+            margin-bottom: 15px;
+            color: #ddd;
         }
 
         #messages {
@@ -121,15 +128,18 @@
     </style>
 </head>
 <body>
-    <div id="particles-js"></div> <!-- Particles.js container -->
+    <div id="particles-js"></div>
+
     <div class="topbar">
-        <h1>TXTTunnel Chat</h1>
+        <h1>Chat Room</h1>
         <div class="nav-buttons">
             <a href="./" class="nav-button">Home</a>
             <a href="./Games.html" class="nav-button">Games</a>
-            <a href="./About.html" class="nav-button2">About</a>
+            <a href="./About.html" class="nav-button">About</a>
+            <a href="./chat.html" class="nav-button2">Chat Room</a>
         </div>
     </div>
+
     <div id="chatContainer">
         <div id="roomInfo">Connected to room: <strong>global</strong></div>
         <div id="messages"></div>
@@ -145,13 +155,28 @@
     </div>
 
     <script>
-        const serverUrl = "https://talk.absalt.com/";
+        const serverUrl = "https://talk.absalt.com";
         let currentRoom = "global";
-        let username = "";
+        let username = localStorage.getItem('username') || "";  // Get saved username from localStorage
         const messagesDiv = document.getElementById("messages");
         const roomInfo = document.getElementById("roomInfo");
         const sendButton = document.getElementById("sendButton");
         const messageInput = document.getElementById("messageInput");
+        const setUsernameButton = document.getElementById("setUsernameButton");
+        let eventSource;
+        let isSendingMessage = false; // Flag to prevent spam
+
+        if (!username) {
+            username = prompt("Enter your username:");
+            if (username) {
+                localStorage.setItem('username', username);  // Save username to localStorage
+            }
+        }
+
+        // Display username on page load
+        if (username) {
+            alert(`Welcome, ${username}!`);
+        }
 
         joinRoom("global");
 
@@ -182,11 +207,13 @@
             }
         });
 
-        document.getElementById("setUsernameButton").addEventListener("click", () => {
-            const newUsername = prompt("Enter your username:");
+        // Allow changing the username
+        setUsernameButton.addEventListener("click", () => {
+            const newUsername = prompt("Enter your new username:");
             if (newUsername) {
                 username = newUsername;
-                alert(`Username set to: ${username}`);
+                localStorage.setItem('username', username);  // Save new username to localStorage
+                alert(`Username changed to: ${username}`);
             }
         });
 
@@ -216,18 +243,68 @@
         function joinRoom(roomId) {
             currentRoom = roomId;
             roomInfo.innerHTML = `Connected to room: <strong>${currentRoom}</strong>`;
-            messagesDiv.innerHTML = "";
+            messagesDiv.innerHTML = ""; // Clear previous messages
 
-            const eventSource = new EventSource(`${serverUrl}/api/v2/tunnel/stream?id=${currentRoom}&subChannel=main`);
+            if (eventSource) {
+                eventSource.close();
+            }
+
+            // Fetch and display the last 5 messages before joining the chat
+            fetch(`${serverUrl}/api/v2/tunnel/messages?roomId=${currentRoom}&count=5`)
+                .then(response => response.json())
+                .then(data => {
+                    // Display the last 5 messages
+                    if (data.messages) {
+                        data.messages.forEach(message => {
+                            const messageElement = document.createElement("div");
+                            messageElement.textContent = message.content;
+                            messagesDiv.appendChild(messageElement);
+                        });
+                        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                    }
+                })
+                .catch(error => console.error("Error fetching messages:", error));
+
+            // Send the "Joined the chat" message to notify others in the room
+            sendJoinMessage();
+
+            // Set up the EventSource to listen for messages in the current room
+            eventSource = new EventSource(`${serverUrl}/api/v2/tunnel/stream?id=${currentRoom}&subChannel=main`);
+
             eventSource.onmessage = (event) => {
                 const message = document.createElement("div");
                 message.textContent = event.data;
                 messagesDiv.appendChild(message);
                 messagesDiv.scrollTop = messagesDiv.scrollHeight;
             };
+
+            eventSource.onerror = (error) => {
+                console.error("Error with EventSource:", error);
+            };
+        }
+
+        function sendJoinMessage() {
+            const joinMessage = `${username} joined the chat`;
+            fetch(`${serverUrl}/api/v2/tunnel/send`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    id: currentRoom,
+                    content: joinMessage,
+                    subChannel: "main"
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    response.text().then(alert);
+                }
+            })
+            .catch(console.error);
         }
 
         function sendMessage() {
+            if (isSendingMessage) return; // Prevent sending while a message is being sent
+
             const message = messageInput.value.trim();
             if (message === "") return;
 
@@ -238,19 +315,32 @@
 
             const formattedMessage = `${username}: ${message}`;
 
+            // Prevent spamming by setting the flag
+            isSendingMessage = true;
+
             fetch(`${serverUrl}/api/v2/tunnel/send`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ id: currentRoom, content: formattedMessage, subChannel: "main" })
+                body: JSON.stringify({
+                    id: currentRoom,
+                    content: formattedMessage,
+                    subChannel: "main"
+                })
             })
             .then(response => {
                 if (response.ok) {
-                    messageInput.value = "";
+                    messageInput.value = ""; // Clear the input field after sending
                 } else {
-                    response.text().then(alert);
+                    response.text().then(alert); // Handle errors by displaying an alert
                 }
             })
-            .catch(console.error);
+            .catch(console.error)
+            .finally(() => {
+                // Allow message sending again after a short delay
+                setTimeout(() => {
+                    isSendingMessage = false;
+                }, 1000); // 1 second delay
+            });
         }
     </script>
 </body>
